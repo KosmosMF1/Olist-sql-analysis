@@ -101,4 +101,80 @@ JOIN orders o
 	ON c.customer_id = o.customer_id
 WHERE c.customer_unique_id = '8d50f5eadf50201ccdcedfb9e2ac8455'
 ORDER BY o.order_purchase_timestamp;
-	
+
+--Сумма заказов--
+SELECT o.order_id,
+	   o.order_status,
+	   o.order_purchase_timestamp,
+	   o.order_delivered_customer_date,
+	   SUM(oi.price) as price_orders
+FROM customers c
+JOIN orders o
+	ON c.customer_id = o.customer_id
+LEFT JOIN order_items oi
+	ON o.order_id = oi.order_id
+WHERE c.customer_unique_id = '8d50f5eadf50201ccdcedfb9e2ac8455'
+GROUP BY o.order_id
+ORDER BY o.order_purchase_timestamp;
+
+--Проверка на подозрительные цены--
+SELECT MAX(price) AS max_price,
+       MIN(price) AS min_price,
+       ROUND(AVG(price), 2) AS avg_price,
+       COUNT(*) FILTER (WHERE price <= 0) AS sub_zero_prices
+FROM order_items;
+
+--Топ-10 самых дорогих товаров--
+SELECT p.product_category_name,
+	   pct.product_category_name_english,
+	   oi.price,
+       oi.order_id, 
+       oi.product_id
+FROM order_items oi
+JOIN products p
+	ON oi.product_id = p.product_id
+JOIN product_category_translation pct
+	ON p.product_category_name = pct.product_category_name
+ORDER BY price DESC 
+LIMIT 10;
+
+--Каждый review_id уникален?--
+SELECT COUNT(*) as all_count, 
+	   COUNT(DISTINCT review_id) AS unique_count
+FROM reviews;
+
+--Какие review_id повторяются и сколько раз каждый из них встречается?--
+WITH count_reviews AS (
+	SELECT review_id,
+		   COUNT(*) AS review_count
+	FROM reviews
+	GROUP BY review_id
+	HAVING COUNT(review_id) > 1
+)
+SELECT review_id, review_count
+FROM count_reviews
+ORDER BY review_count DESC;
+
+--Проверка платежей--
+SELECT payment_type, 
+       MIN(payment_value) AS min_value, 
+       MAX(payment_value) AS max_value,
+       ROUND(AVG(payment_value), 2) AS avg_value,
+       COUNT(*) FILTER (WHERE payment_value <= 0) AS sub_zero_values,
+       COUNT(payment_type) AS count_pay_type
+FROM payments
+GROUP BY payment_type;
+
+--Платежи равные и меньше нуля--
+SELECT order_id,
+	   payment_type,
+	   payment_sequential,
+	   payment_installments,
+	   payment_value
+FROM payments
+WHERE payment_value <= 0;
+
+--Проверка составного ключа таблицы order_items--
+SELECT COUNT(*) AS all_count,
+	   COUNT(DISTINCT (order_id, order_item_id)) AS unique_count
+FROM order_items
